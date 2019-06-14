@@ -18,6 +18,7 @@ namespace TileEditor
 		private int TileWidth;
 		private int TileHeight;
 		private string[,] Paths;
+		private PictureBox[,] Tiles;
 
 		public EditorForm()
 		{
@@ -41,6 +42,8 @@ namespace TileEditor
 		{
 			Controls.Clear();
 
+			Tiles = new PictureBox[MapWidth, MapHeight];
+
 			for (var y = 0; y < MapHeight; y++)
 			{
 				for (var x = 0; x < MapWidth; x++)
@@ -59,8 +62,65 @@ namespace TileEditor
 					};
 
 					pictureBox.Click += PictureBox_Click;
+					pictureBox.AllowDrop = true;
+					pictureBox.DragDrop += PictureBox_DragDrop;
+					pictureBox.DragOver += PictureBox_DragOver;
+					pictureBox.DragEnter += PictureBox_DragEnter;
+					pictureBox.QueryContinueDrag += PictureBox_QueryContinueDrag;
+
+					Tiles[x, y] = pictureBox;
 
 					Controls.Add(pictureBox);
+				}
+			}
+		}
+
+		private void PictureBox_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
+		{
+			e.Action = DragAction.Continue;
+		}
+
+		private void PictureBox_DragEnter(object sender, DragEventArgs e)
+		{
+			e.Effect = DragDropEffects.Copy;
+		}
+
+		private void PictureBox_DragOver(object sender, DragEventArgs e)
+		{
+			e.Effect = DragDropEffects.Copy;
+		}
+
+		private void PictureBox_DragDrop(object sender, DragEventArgs e)
+		{
+			var pictureBox = sender as PictureBox;
+
+			var point = pictureBox.Tag as Point?;
+
+			var x = point.Value.X;
+			var y = point.Value.Y;
+
+			var formats = e.Data.GetFormats();
+
+			if (e.Data.GetDataPresent(DataFormats.FileDrop))
+			{
+				var fileNames = e.Data.GetData(DataFormats.FileDrop) as string[];
+
+				foreach (var fileName in fileNames)
+				{
+					Paths[x, y] = fileName;
+
+					LoadTile(Tiles[x, y]);
+
+					x++;
+
+					if (x == MapWidth)
+					{
+						x = 0;
+						y++;
+
+						if (y == MapHeight)
+							break;
+					}
 				}
 			}
 		}
@@ -77,23 +137,29 @@ namespace TileEditor
 			{
 				Paths[point.Value.X, point.Value.Y] = openFileDialog.FileName;
 
-				//pictureBox.ImageLocation = openFileDialog.FileName;
+				LoadTile(pictureBox);
+			}
+		}
 
-				using (var image = Image.FromFile(openFileDialog.FileName))
+		private void LoadTile(PictureBox pictureBox)
+		{
+			var point = pictureBox.Tag as Point?;
+
+			using (var image = Image.FromFile(Paths[point.Value.X, point.Value.Y]))
+			{
+				var bitmap = new Bitmap(TileWidth, TileHeight);
+
+				using (var graphics = Graphics.FromImage(bitmap))
 				{
-					var bitmap = new Bitmap(TileWidth, TileHeight);
+					graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+					graphics.SmoothingMode = SmoothingMode.None;
+					graphics.PixelOffsetMode = PixelOffsetMode.Half;
 
-					using (var graphics = Graphics.FromImage(bitmap))
-					{
-						graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-						graphics.SmoothingMode = SmoothingMode.None;
-						graphics.PixelOffsetMode = PixelOffsetMode.Half;
-
-						graphics.DrawImage(image, 0, 0, TileWidth, TileHeight);
-					}
-
-					pictureBox.Image = bitmap;
+					graphics.DrawImage(image, 0, 0, TileWidth, TileHeight);
 				}
+
+				pictureBox.Image = bitmap;
+				toolTip.SetToolTip(pictureBox, Paths[point.Value.X, point.Value.Y]);
 			}
 		}
 	}
