@@ -68,6 +68,8 @@ namespace TileEditor
 					pictureBox.DragEnter += PictureBox_DragEnter;
 					pictureBox.QueryContinueDrag += PictureBox_QueryContinueDrag;
 
+					pictureBox.MouseDown += PictureBox_MouseDown;
+
 					Tiles[x, y] = pictureBox;
 
 					Controls.Add(pictureBox);
@@ -75,19 +77,30 @@ namespace TileEditor
 			}
 		}
 
+		private void PictureBox_MouseDown(object sender, MouseEventArgs e)
+		{
+			var pictureBox = sender as PictureBox;
+			var point = pictureBox.Tag as Point?;
+			var file = Paths[point.Value.X, point.Value.Y];
+
+			pictureBox.DoDragDrop(file ?? string.Empty, DragDropEffects.Copy);
+		}
+
 		private void PictureBox_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
 		{
-			e.Action = DragAction.Continue;
+			//System.Diagnostics.Debug.WriteLine(e.Action);
+
+			//e.Action = DragAction.Continue;
 		}
 
 		private void PictureBox_DragEnter(object sender, DragEventArgs e)
 		{
-			e.Effect = DragDropEffects.Copy;
+			e.Effect = DragDropEffects.All;
 		}
 
 		private void PictureBox_DragOver(object sender, DragEventArgs e)
 		{
-			e.Effect = DragDropEffects.Copy;
+			e.Effect = DragDropEffects.All;
 		}
 
 		private void PictureBox_DragDrop(object sender, DragEventArgs e)
@@ -123,6 +136,22 @@ namespace TileEditor
 					}
 				}
 			}
+
+			if (e.Data.GetDataPresent(DataFormats.StringFormat))
+			{
+				var fileName = e.Data.GetData(DataFormats.StringFormat) as string;
+
+				if (string.IsNullOrWhiteSpace(fileName))
+				{
+					Paths[x, y] = null;
+				}
+				else
+				{
+					Paths[x, y] = fileName;
+				}
+
+				LoadTile(Tiles[x, y]);
+			}
 		}
 
 		private void PictureBox_Click(object sender, EventArgs e)
@@ -144,23 +173,32 @@ namespace TileEditor
 		private void LoadTile(PictureBox pictureBox)
 		{
 			var point = pictureBox.Tag as Point?;
+			var path = Paths[point.Value.X, point.Value.Y];
 
-			using (var image = Image.FromFile(Paths[point.Value.X, point.Value.Y]))
+			if (path == null)
 			{
-				var bitmap = new Bitmap(TileWidth, TileHeight);
-
-				using (var graphics = Graphics.FromImage(bitmap))
-				{
-					graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-					graphics.SmoothingMode = SmoothingMode.None;
-					graphics.PixelOffsetMode = PixelOffsetMode.Half;
-
-					graphics.DrawImage(image, 0, 0, TileWidth, TileHeight);
-				}
-
-				pictureBox.Image = bitmap;
-				toolTip.SetToolTip(pictureBox, Paths[point.Value.X, point.Value.Y]);
+				pictureBox.Image = null;
 			}
+			else
+			{
+				using (var image = Image.FromFile(path))
+				{
+					var bitmap = new Bitmap(TileWidth, TileHeight);
+
+					using (var graphics = Graphics.FromImage(bitmap))
+					{
+						graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+						graphics.SmoothingMode = SmoothingMode.None;
+						graphics.PixelOffsetMode = PixelOffsetMode.Half;
+
+						graphics.DrawImage(image, 0, 0, TileWidth, TileHeight);
+					}
+
+					pictureBox.Image = bitmap;
+				}
+			}
+
+			toolTip.SetToolTip(pictureBox, Paths[point.Value.X, point.Value.Y]);
 		}
 	}
 }
